@@ -322,12 +322,26 @@
                     <div class="border-t border-dashed border-slate-300 pt-6">
                         <div class="max-w-xl mx-auto bg-amber-50/70 border border-amber-200/60 p-6 rounded-2xl space-y-4">
                             <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 text-center">Ringkasan Pemesanan</h4>
-                            <div class="text-xs md:text-sm space-y-2.5 text-slate-600">
+                            
+                            <div class="text-xs md:text-sm space-y-2.5 text-slate-600 border-b border-slate-200 pb-3">
                                 <div class="flex justify-between"><span>Paket Terpilih</span><span id="summaryPaket" class="font-medium">Rp0</span></div>
                                 <div class="flex justify-between"><span>Layanan Tambahan</span><span id="summaryAddons" class="font-medium">Rp0</span></div>
                                 <div class="flex justify-between"><span>Biaya Transportasi & Ferry</span><span id="summaryTranspor" class="font-medium">Rp0</span></div>
                             </div>
-                            <div class="border-t border-slate-200 pt-3 flex justify-between items-baseline">
+
+                            <!-- PENAMBAHAN KALKULASI DP SECARA LIVE DI WEB -->
+                            <div class="text-xs md:text-sm space-y-2 bg-white/60 p-3 rounded-xl border border-amber-100">
+                                <div class="flex justify-between text-slate-700">
+                                    <span class="font-medium">✨ Wajib DP Berapa (30%)</span>
+                                    <span id="summaryDP" class="font-bold text-emerald-700">Rp0</span>
+                                </div>
+                                <div class="flex justify-between text-slate-600">
+                                    <span>Sisa Pelunasan H-1 (70%)</span>
+                                    <span id="summaryPelunasan" class="font-medium text-slate-800">Rp0</span>
+                                </div>
+                            </div>
+
+                            <div class="pt-1 flex justify-between items-baseline">
                                 <span class="text-sm font-bold uppercase">Total Pembayaran</span>
                                 <span class="text-2xl font-extrabold text-amber-600" id="summaryTotal">Rp0</span>
                             </div>
@@ -428,10 +442,18 @@
             const totalTranspor = hargaTransporMurni + hargaFerry;
             const totalSemua = hargaPaket + hargaAddons + totalTranspor;
 
+            // Hitung DP 30% dan Pelunasan 70%
+            const nilaiDP = Math.round(totalSemua * 0.3);
+            const nilaiPelunasan = totalSemua - nilaiDP;
+
             document.getElementById('summaryPaket').innerText = "Rp" + hargaPaket.toLocaleString('id-ID');
             document.getElementById('summaryAddons').innerText = "Rp" + hargaAddons.toLocaleString('id-ID');
             document.getElementById('summaryTranspor').innerText = "Rp" + totalTranspor.toLocaleString('id-ID');
             document.getElementById('summaryTotal').innerText = "Rp" + totalSemua.toLocaleString('id-ID');
+            
+            // Masukkan data DP ke UI Web
+            document.getElementById('summaryDP').innerText = "Rp" + nilaiDP.toLocaleString('id-ID');
+            document.getElementById('summaryPelunasan').innerText = "Rp" + nilaiPelunasan.toLocaleString('id-ID');
         }
 
         document.querySelectorAll('input[name="paket"], input[name="addons"]').forEach(input => {
@@ -448,7 +470,6 @@
         bookingForm.addEventListener('submit', function(e) {
             e.preventDefault();
 
-            // Ambil Nilai Form
             const nama = document.getElementById('namaKlien').value;
             const wa = document.getElementById('nomorKlien').value;
             const tanggal = document.getElementById('tanggalAcara').value;
@@ -459,17 +480,20 @@
             const catatan = document.getElementById('catatanTambahan').value || "-";
 
             const paketNama = document.querySelector('input[name="paket"]:checked').parentElement.querySelector('h4').innerText;
-            const totalBayar = document.getElementById('summaryTotal').innerText;
+            
+            const totalBayarTeks = document.getElementById('summaryTotal').innerText;
+            const dpTeks = document.getElementById('summaryDP').innerText;
+            const pelunasanTeks = document.getElementById('summaryPelunasan').innerText;
 
             // PROSES PEMBUATAN PDF KLIEN VIA jspdf
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
             // Desain Header Nota PDF
-            doc.setFillColor(253, 253, 244); // Background cream
+            doc.setFillColor(253, 253, 244);
             doc.rect(0, 0, 210, 297, "F");
             
-            doc.setFillColor(245, 158, 11); // Warna Amber hiasan atas
+            doc.setFillColor(245, 158, 11);
             doc.rect(0, 0, 210, 8, "F");
 
             doc.setTextColor(30, 41, 59);
@@ -483,11 +507,9 @@
             doc.text("Wedding Content Creator - Kotabaru Tengah", 20, 30);
             doc.text("WhatsApp: 0852-4955-8096 | Instagram: @kitabekisah.wcc", 20, 35);
 
-            // Garis Pembatas
             doc.setDrawColor(200, 200, 200);
             doc.line(20, 40, 190, 40);
 
-            // Judul Dokumen
             doc.setFont("Helvetica", "bold");
             doc.setFontSize(14);
             doc.setTextColor(180, 83, 9);
@@ -518,58 +540,69 @@
             doc.text(`• Paket Utama Terpilih :  ${paketNama}`, 22, 140);
             doc.text(`• Catatan Khusus         :  ${catatan}`, 22, 146);
 
-            // Kotak Ringkasan Total Pembayaran
-            doc.setFillColor(254, 243, 199);
-            doc.rect(20, 156, 170, 16, "F");
+            // KOTAK RINCIAN KEUANGAN BARU (DP & SISA PELUNASAN DI PDF)
+            doc.setFillColor(248, 250, 252); // Abu-abu terang background
+            doc.setDrawColor(226, 232, 240);
+            doc.rect(20, 154, 170, 30, "FD");
+            
+            doc.setFont("Helvetica", "normal");
+            doc.setFontSize(10);
+            doc.text("Total Nilai Kontrak Layanan", 25, 161);
+            doc.text(totalBayarTeks, 145, 161);
+            
             doc.setFont("Helvetica", "bold");
-            doc.setFontSize(12);
-            doc.text("TOTAL ESTIMASI BIAYA:", 25, 166);
-            doc.setTextColor(180, 83, 9);
-            doc.text(totalBayar, 140, 166);
-
-            // Lembar Persetujuan S&K Hukum
+            doc.setTextColor(16, 185, 129); // Hijau untuk DP
+            doc.text("Uang Muka / Estimasi DP Minimal (30%)", 25, 169);
+            doc.text(dpTeks, 145, 169);
+            
             doc.setTextColor(30, 41, 59);
+            doc.setFont("Helvetica", "normal");
+            doc.text("Sisa Pembayaran / Pelunasan H-1 (70%)", 25, 177);
+            doc.setFont("Helvetica", "bold");
+            doc.text(pelunasanTeks, 145, 177);
+
+            // Lembar Persetujuan S&K
             doc.setFontSize(10);
             doc.setFont("Helvetica", "bold");
-            doc.text("PERNYATAAN PERSETUJUAN (S&K):", 20, 185);
+            doc.text("PERNYATAAN PERSETUJUAN (S&K):", 20, 195);
             doc.setFont("Helvetica", "oblique");
             doc.setFontSize(9);
             doc.setTextColor(100, 100, 100);
-            doc.text("Dengan ini klien menyatakan telah membaca, memahami, dan menyetujui seluruh aturan", 20, 192);
-            doc.text("mengenai kebijakan DP 30%, reschedule, penyesuaian tarif transpor, batas aktif Google Drive (30 Hari),", 20, 197);
-            doc.text("serta hak publikasi portofolio yang berlaku di Kitabekisah.wcc.", 20, 202);
+            doc.text("Dengan ini klien menyatakan telah membaca, memahami, dan menyetujui seluruh aturan", 20, 202);
+            doc.text("mengenai kebijakan DP 30%, reschedule, penyesuaian tarif transpor, batas aktif Google Drive (30 Hari),", 20, 207);
+            doc.text("serta hak publikasi portofolio yang berlaku di Kitabekisah.wcc.", 20, 212);
 
             // Tanda Tangan Digital/Sistem
             doc.setFont("Helvetica", "normal");
             doc.setTextColor(30, 41, 59);
-            doc.text("Status Persetujuan Form:", 20, 215);
+            doc.text("Status Persetujuan Form:", 20, 225);
             doc.setFont("Helvetica", "bold");
-            doc.setTextColor(16, 185, 129); // Hijau terverifikasi
-            doc.text("[ DISETUJUI & DIVALIDASI OLEH KLIEN VIA WEB ]", 65, 215);
+            doc.setTextColor(16, 185, 129);
+            doc.text("[ DISETUJUI & DIVALIDASI OLEH KLIEN VIA WEB ]", 65, 225);
 
-            // Ambil teks waktu otomatis saat cetak nota
+            // Waktu cetak
             const waktuSekarang = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Makassar' });
             doc.setFont("Helvetica", "normal");
             doc.setFontSize(8);
             doc.setTextColor(150, 150, 150);
-            doc.text(`Dicetak otomatis melalui sistem kitabekisah pada: ${waktuSekarang} WITA`, 20, 230);
+            doc.text(`Dicetak otomatis melalui sistem kitabekisah pada: ${waktuSekarang} WITA`, 20, 240);
 
             // Simpan / Download Otomatis PDF ke Perangkat Klien
             const namaFilePDF = `Order_${nama.replace(/\s+/g, '_')}.pdf`;
             doc.save(namaFilePDF);
 
-
             // PROSES KIRIM WA BERIKUTNYA
             const nomorWA = "6285249558096"; 
             let teksPesan = "*HALO TIM KITABEKISAH.WCC!*%0A";
             teksPesan += "Saya baru saja mengisi format order resmi di website.%0A%0A";
-            teksPesan += "*Detail Pemesan:*%0A";
-            teksPesan += "• Nama: " + nama + "%0A";
-            teksPesan += "• Paket: " + paketNama + "%0A";
-            teksPesan += "• Total: *" + totalBayar + "*%0A%0A";
-            teksPesan += "File nota *PDF Format Order* otomatis sudah terunduh di perangkat saya. Berikut saya lampirkan dokumen PDF beserta Bukti Transfer DP-nya ya! 🙏✨";
+            teksPesan += "*Rincian Pembayaran Berdasarkan Sistem:*%0A";
+            teksPesan += "• Nama Pemesan: " + nama + "%0A";
+            teksPesan += "• Paket Terpilih: " + paketNama + "%0A";
+            teksPesan += "• Total Biaya: " + totalBayarTeks + "%0A";
+            teksPesan += "• *Wajib DP (30%): " + dpTeks + "*%0A";
+            teksPesan += "• Sisa Pelunasan H-1: " + pelunasanTeks + "%0A%0A";
+            teksPesan += "File berkas *PDF Format Order* sudah otomatis terunduh di perangkat saya. Berikut saya kirim berkas PDF tersebut beserta foto Bukti Transfer DP-nya ya! 🙏✨";
 
-            // Direct Buka Aplikasi WhatsApp
             window.open("https://api.whatsapp.com/send?phone=" + nomorWA + "&text=" + teksPesan, "_blank");
         });
     </script>
